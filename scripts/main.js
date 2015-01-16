@@ -29,7 +29,6 @@
     // When feature layer is fully loaded, end loading indicator
     features.on('load', function(e) {
         NProgress.done();
-        console.log("Loaded", e, features._layers.length);
         fillPanel(features._layers);
     });
     
