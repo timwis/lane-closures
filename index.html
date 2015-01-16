@@ -29,14 +29,22 @@
         <div id="panel"></div>
     </div>
     
+    <script type="text/x-handlebars-template" id="tmpl-popup">
+        <b>{{ ADDRESS }}</b><br>
+        {{ PURPOSE }}<br>
+        {{ OCCUPANCYTYPE }}<br>
+        Expires {{ relativeTime EXPIRATIONDATE }}
+    </script>
+    
     <script type="text/x-handlebars-template" id="tmpl-panel">
         <ul class="list-group">
             {{#each features}}
             <li class="list-group-item">
-                <a href="#" data-feature-id="{{ this.feature.id }}">{{ this.feature.properties.PURPOSE }}</a><br>
+                <a href="#" data-feature-id="{{ this.feature.id }}">{{ this.feature.properties.ADDRESS }}</a><br>
                 <span class="list-group-item-detail">
+                {{ this.feature.properties.PURPOSE }}<br>
                 {{ this.feature.properties.OCCUPANCYTYPE }}<br>
-                Expires {{ this.feature.properties.EXPIRATIONDATE }}<br>
+                Expires {{ relativeTime this.feature.properties.EXPIRATIONDATE }}<br>
                 </span>
             </li>
             {{/each}}
@@ -48,6 +56,7 @@
     <script src="vendor/leaflet/dist/leaflet.js"></script>
     <script src="vendor/esri-leaflet/dist/esri-leaflet-src.js"></script>
     <script src="vendor/nprogress/nprogress.js"></script>
+    <script src="vendor/moment/min/moment.min.js"></script>
     <script src="scripts/main.js"></script>
 </body>
 </html>

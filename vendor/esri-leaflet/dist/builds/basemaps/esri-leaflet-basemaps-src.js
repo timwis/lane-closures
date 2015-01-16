@@ -1,5 +1,5 @@
-/*! esri-leaflet - v1.0.0-rc.3 - 2014-11-04
-*   Copyright (c) 2014 Environmental Systems Research Institute, Inc.
+/*! esri-leaflet - v1.0.0-rc.5 - 2015-01-03
+*   Copyright (c) 2015 Environmental Systems Research Institute, Inc.
 *   Apache License*/
 (function (factory) {
   //define an AMD module that relies on 'leaflet'
@@ -17,7 +17,7 @@
   }
 }(function (L) {
 var EsriLeaflet = { //jshint ignore:line
-  VERSION: '1.0.0-rc.2',
+  VERSION: '1.0.0-rc.5',
   Layers: {},
   Services: {},
   Controls: {},
@@ -33,6 +33,7 @@ if(typeof window !== 'undefined' && window.L){
   window.L.esri = EsriLeaflet;
 }
 
+
 (function(EsriLeaflet){
 
   var callbacks = 0;
@@ -42,7 +43,7 @@ if(typeof window !== 'undefined' && window.L){
   function serialize(params){
     var data = '';
 
-    params.f = 'json';
+    params.f = params.f || 'json';
 
     for (var key in params){
       if(params.hasOwnProperty(key)){
@@ -54,7 +55,9 @@ if(typeof window !== 'undefined' && window.L){
           data += '&';
         }
 
-        if(type === '[object Array]' || type === '[object Object]'){
+        if (type === '[object Array]'){
+          value = (Object.prototype.toString.call(param[0]) === '[object Object]') ? JSON.stringify(param) : param.join(',');
+        } else if (type === '[object Object]') {
           value = JSON.stringify(param);
         } else if (type === '[object Date]'){
           value = param.valueOf();
@@ -211,10 +214,10 @@ if(typeof window !== 'undefined' && window.L){
     }
   };
 
-  // Choose the correct AJAX handler depending on CORS support
+  // choose the correct AJAX handler depending on CORS support
   EsriLeaflet.get = (EsriLeaflet.Support.CORS) ? EsriLeaflet.Request.get.CORS : EsriLeaflet.Request.get.JSONP;
 
-  // Always use XMLHttpRequest for posts
+  // always use XMLHttpRequest for posts
   EsriLeaflet.post = EsriLeaflet.Request.post.XMLHTTP;
 
   // expose a common request method the uses GET\POST based on request length
@@ -288,25 +291,25 @@ if(typeof window !== 'undefined' && window.L){
           }
         },
         DarkGray: {
-          urlTemplate: tileProtocol + '//tiles{s}.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Dark_Gray_Base_Beta/MapServer/tile/{z}/{y}/{x}',
+          urlTemplate: tileProtocol + '//{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
           options: {
             hideLogo: false,
             logoPosition: 'bottomright',
             minZoom: 1,
-            maxZoom: 10,
-            subdomains: ['1', '2'],
+            maxZoom: 16,
+            subdomains: ['server', 'services'],
             attribution: 'Esri, DeLorme, HERE'
           }
         },
         DarkGrayLabels: {
-          urlTemplate: tileProtocol + '//tiles{s}.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Dark_Gray_Reference_Beta/MapServer/tile/{z}/{y}/{x}',
+          urlTemplate: tileProtocol + '//{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
           options: {
             hideLogo: true,
             logoPosition: 'bottomright',
             //pane: 'esri-label',
             minZoom: 1,
-            maxZoom: 10,
-            subdomains: ['1', '2']
+            maxZoom: 16,
+            subdomains: ['server', 'services']
           }
         },
         Gray: {
@@ -432,12 +435,14 @@ if(typeof window !== 'undefined' && window.L){
       if(config.attributionUrl){
         this._getAttributionData(config.attributionUrl);
       }
+      this._logo = new EsriLeaflet.Controls.Logo({
+        position: this.options.logoPosition
+      });
     },
     onAdd: function(map){
-      if(!this.options.hideLogo){
-        this._logo = new EsriLeaflet.Controls.Logo({
-          position: this.options.logoPosition
-        }).addTo(map);
+      if(!this.options.hideLogo && !map._hasEsriLogo){
+        this._logo.addTo(map);
+        map._hasEsriLogo = true;
       }
 
       // if(this.options.pane && EsriLeaflet.Support.pointerEvents){
@@ -451,6 +456,7 @@ if(typeof window !== 'undefined' && window.L){
     onRemove: function(map){
       if(this._logo){
         map.removeControl(this._logo);
+        map._hasEsriLogo = false;
       }
 
       L.TileLayer.prototype.onRemove.call(this, map);
@@ -544,7 +550,7 @@ EsriLeaflet.Controls.Logo = L.Control.extend({
     div.style.marginLeft = this.options.marginLeft;
     div.style.marginBottom = this.options.marginBottom;
     div.style.marginRight = this.options.marginRight;
-    div.innerHTML = '<a href="https://developers.arcgis.com" style="border: none;"><img src="https://js.arcgis.com/3.10/js/esri/images/map/logo-med.png" style="border: none;"></a>';
+    div.innerHTML = '<a href="https://developers.arcgis.com" style="border: none;"><img src="https://js.arcgis.com/3.11/esri/images/map/logo-med.png" style="border: none;"></a>';
     return div;
   }
 });

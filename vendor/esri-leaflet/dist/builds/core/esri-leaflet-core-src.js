@@ -1,5 +1,5 @@
-/*! esri-leaflet - v1.0.0-rc.3 - 2014-11-04
-*   Copyright (c) 2014 Environmental Systems Research Institute, Inc.
+/*! esri-leaflet - v1.0.0-rc.5 - 2015-01-03
+*   Copyright (c) 2015 Environmental Systems Research Institute, Inc.
 *   Apache License*/
 (function (factory) {
   //define an AMD module that relies on 'leaflet'
@@ -17,7 +17,7 @@
   }
 }(function (L) {
 var EsriLeaflet = { //jshint ignore:line
-  VERSION: '1.0.0-rc.2',
+  VERSION: '1.0.0-rc.5',
   Layers: {},
   Services: {},
   Controls: {},
@@ -33,7 +33,15 @@ if(typeof window !== 'undefined' && window.L){
   window.L.esri = EsriLeaflet;
 }
 
+
 (function(EsriLeaflet){
+
+  // normalize request animation frame
+  var raf = window.requestAnimationFrame ||
+     window.webkitRequestAnimationFrame ||
+     window.mozRequestAnimationFrame ||
+     window.msRequestAnimationFrame ||
+     function(cb) { return window.setTimeout(cb, 1000 / 60); };
 
   // shallow object clone for feature properties and attributes
   // from http://jsperf.com/cloning-an-object/2
@@ -426,6 +434,10 @@ if(typeof window !== 'undefined' && window.L){
     return url;
   };
 
+  EsriLeaflet.Util.isArcgisOnline = function(url){
+    return (/\.arcgis\.com/g).test(url);
+  };
+
   EsriLeaflet.Util.geojsonTypeToArcGIS = function (geoJsonType) {
     var arcgisGeometryType;
     switch (geoJsonType) {
@@ -451,6 +463,8 @@ if(typeof window !== 'undefined' && window.L){
     return arcgisGeometryType;
   };
 
+  EsriLeaflet.Util.requestAnimationFrame = L.Util.bind(raf, window);
+
 })(EsriLeaflet);
 
 (function(EsriLeaflet){
@@ -462,7 +476,7 @@ if(typeof window !== 'undefined' && window.L){
   function serialize(params){
     var data = '';
 
-    params.f = 'json';
+    params.f = params.f || 'json';
 
     for (var key in params){
       if(params.hasOwnProperty(key)){
@@ -474,7 +488,9 @@ if(typeof window !== 'undefined' && window.L){
           data += '&';
         }
 
-        if(type === '[object Array]' || type === '[object Object]'){
+        if (type === '[object Array]'){
+          value = (Object.prototype.toString.call(param[0]) === '[object Object]') ? JSON.stringify(param) : param.join(',');
+        } else if (type === '[object Object]') {
           value = JSON.stringify(param);
         } else if (type === '[object Date]'){
           value = param.valueOf();
@@ -631,10 +647,10 @@ if(typeof window !== 'undefined' && window.L){
     }
   };
 
-  // Choose the correct AJAX handler depending on CORS support
+  // choose the correct AJAX handler depending on CORS support
   EsriLeaflet.get = (EsriLeaflet.Support.CORS) ? EsriLeaflet.Request.get.CORS : EsriLeaflet.Request.get.JSONP;
 
-  // Always use XMLHttpRequest for posts
+  // always use XMLHttpRequest for posts
   EsriLeaflet.post = EsriLeaflet.Request.post.XMLHTTP;
 
   // expose a common request method the uses GET\POST based on request length
@@ -651,35 +667,20 @@ EsriLeaflet.Tasks.Task = L.Class.extend({
 
   //Generate a method for each methodName:paramName in the setters for this task.
   generateSetter: function(param, context){
-    var isArray = param.match(/([a-zA-Z]+)\[\]/);
-
-    param = (isArray) ? isArray[1] : param;
-
-    if(isArray){
-      return L.Util.bind(function(value){
-        // this.params[param] = (this.params[param]) ? this.params[param] + ',' : '';
-        if (L.Util.isArray(value)) {
-          this.params[param] = value.join(',');
-        } else {
-          this.params[param] = value;
-        }
-        return this;
-      }, context);
-    } else {
-      return L.Util.bind(function(value){
-        this.params[param] = value;
-        return this;
-      }, context);
-    }
+    return L.Util.bind(function(value){
+      this.params[param] = value;
+      return this;
+    }, context);
   },
 
-  initialize: function(endpoint, options){
-    // endpoint can be either a url to an ArcGIS Rest Service or an instance of EsriLeaflet.Service
-    if(endpoint.url && endpoint.request){
+  initialize: function(endpoint){
+    // endpoint can be either a url (and options) for an ArcGIS Rest Service or an instance of EsriLeaflet.Service
+    if(endpoint.request && endpoint.options){
       this._service = endpoint;
-      this.url = endpoint.url;
+      L.Util.setOptions(this, endpoint.options);
     } else {
-      this.url = EsriLeaflet.Util.cleanUrl(endpoint);
+      L.Util.setOptions(this, endpoint);
+      this.options.url = L.esri.Util.cleanUrl(endpoint.url);
     }
 
     // clone default params into this object
@@ -692,8 +693,6 @@ EsriLeaflet.Tasks.Task = L.Class.extend({
         this[setter] = this.generateSetter(param, this);
       }
     }
-
-    L.Util.setOptions(this, options);
   },
 
   token: function(token){
@@ -714,7 +713,7 @@ EsriLeaflet.Tasks.Task = L.Class.extend({
   },
 
   _request: function(method, path, params, callback, context){
-    var url = (this.options.proxy) ? this.options.proxy + '?' + this.url + path : this.url + path;
+    var url = (this.options.proxy) ? this.options.proxy + '?' + this.options.url + path : this.options.url + path;
     if((method === 'get' || method === 'request') && !this.options.useCors){
       return EsriLeaflet.Request.get.JSONP(url, params, callback, context);
     } else{
@@ -732,11 +731,12 @@ EsriLeaflet.Services.Service = L.Class.extend({
     useCors: EsriLeaflet.Support.CORS
   },
 
-  initialize: function (url, options) {
-    this.url = EsriLeaflet.Util.cleanUrl(url);
+  initialize: function (options) {
+    options = options || {};
     this._requestQueue = [];
     this._authenticating = false;
     L.Util.setOptions(this, options);
+    this.options.url = EsriLeaflet.Util.cleanUrl(this.options.url);
   },
 
   get: function (path, params, callback, context) {
@@ -764,7 +764,7 @@ EsriLeaflet.Services.Service = L.Class.extend({
 
   _request: function(method, path, params, callback, context){
     this.fire('requeststart', {
-      url: this.url + path,
+      url: this.options.url + path,
       params: params,
       method: method
     });
@@ -779,7 +779,7 @@ EsriLeaflet.Services.Service = L.Class.extend({
       this._requestQueue.push([method, path, params, callback, context]);
       return;
     } else {
-      var url = (this.options.proxy) ? this.options.proxy + '?' + this.url + path : this.url + path;
+      var url = (this.options.proxy) ? this.options.proxy + '?' + this.options.url + path : this.options.url + path;
 
       if((method === 'get' || method === 'request') && !this.options.useCors){
         return EsriLeaflet.Request.get.JSONP(url, params, wrappedCallback);
@@ -807,7 +807,7 @@ EsriLeaflet.Services.Service = L.Class.extend({
 
         if(error) {
           this.fire('requesterror', {
-            url: this.url + path,
+            url: this.options.url + path,
             params: params,
             message: error.message,
             code: error.code,
@@ -815,7 +815,7 @@ EsriLeaflet.Services.Service = L.Class.extend({
           });
         } else {
           this.fire('requestsuccess', {
-            url: this.url + path,
+            url: this.options.url + path,
             params: params,
             response: response,
             method: method
@@ -823,7 +823,7 @@ EsriLeaflet.Services.Service = L.Class.extend({
         }
 
         this.fire('requestend', {
-          url: this.url + path,
+          url: this.options.url + path,
           params: params,
           method: method
         });
@@ -842,8 +842,8 @@ EsriLeaflet.Services.Service = L.Class.extend({
 
 });
 
-EsriLeaflet.Services.service = function(url, params){
-  return new EsriLeaflet.Services.Service(url, params);
+EsriLeaflet.Services.service = function(params){
+  return new EsriLeaflet.Services.Service(params);
 };
 
   return EsriLeaflet;

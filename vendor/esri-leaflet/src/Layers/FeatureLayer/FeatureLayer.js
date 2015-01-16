@@ -4,6 +4,10 @@ EsriLeaflet.Layers.FeatureLayer = EsriLeaflet.Layers.FeatureManager.extend({
     EVENTS: 'click dblclick mouseover mouseout mousemove contextmenu popupopen popupclose'
   },
 
+  options: {
+    cacheLayers: true
+  },
+
   /**
    * Constructor
    */
@@ -23,11 +27,13 @@ EsriLeaflet.Layers.FeatureLayer = EsriLeaflet.Layers.FeatureManager.extend({
    */
 
   onAdd: function(map){
+    map.on('zoomstart zoomend', function(e){
+      this._zooming = (e.type === 'zoomstart');
+    }, this);
     return EsriLeaflet.Layers.FeatureManager.prototype.onAdd.call(this, map);
   },
 
   onRemove: function(map){
-
     for (var i in this._layers) {
       map.removeLayer(this._layers[i]);
     }
@@ -138,6 +144,50 @@ EsriLeaflet.Layers.FeatureLayer = EsriLeaflet.Layers.FeatureManager.extend({
     }
   },
 
+  cellEnter: function(bounds, coords){
+    if(!this._zooming){
+      EsriLeaflet.Util.requestAnimationFrame(L.Util.bind(function(){
+        var cacheKey = this._cacheKey(coords);
+        var cellKey = this._cellCoordsToKey(coords);
+        var layers = this._cache[cacheKey];
+        if(this._activeCells[cellKey] && layers){
+          this.addLayers(layers);
+        }
+      }, this));
+    }
+  },
+
+  cellLeave: function(bounds, coords){
+    if(!this._zooming){
+      EsriLeaflet.Util.requestAnimationFrame(L.Util.bind(function(){
+        var cacheKey = this._cacheKey(coords);
+        var cellKey = this._cellCoordsToKey(coords);
+        var layers = this._cache[cacheKey];
+        var mapBounds = this._map.getBounds();
+        if(!this._activeCells[cellKey] && layers){
+          var removable = true;
+
+          for (var i = 0; i < layers.length; i++) {
+            var layer = this._layers[layers[i]];
+            if(layer && layer.getBounds && mapBounds.intersects(layer.getBounds())){
+              removable = false;
+            }
+          }
+
+          if(removable){
+            this.removeLayers(layers, !this.options.cacheLayers);
+          }
+
+          if(!this.options.cacheLayers && removable){
+            delete this._cache[cacheKey];
+            delete this._cells[cellKey];
+            delete this._activeCells[cellKey];
+          }
+        }
+      }, this));
+    }
+  },
+
   /**
    * Styling Methods
    */
@@ -173,6 +223,7 @@ EsriLeaflet.Layers.FeatureLayer = EsriLeaflet.Layers.FeatureManager.extend({
     else if (!style && !layer.defaultOptions) {
       var dummyPath = new L.Path();
       style = L.Path.prototype.options;
+      style.fill = true; //not set by default
     }
 
     if (layer.setStyle) {

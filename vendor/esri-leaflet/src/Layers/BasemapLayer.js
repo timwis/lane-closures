@@ -64,25 +64,25 @@
           }
         },
         DarkGray: {
-          urlTemplate: tileProtocol + '//tiles{s}.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Dark_Gray_Base_Beta/MapServer/tile/{z}/{y}/{x}',
+          urlTemplate: tileProtocol + '//{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
           options: {
             hideLogo: false,
             logoPosition: 'bottomright',
             minZoom: 1,
-            maxZoom: 10,
-            subdomains: ['1', '2'],
+            maxZoom: 16,
+            subdomains: ['server', 'services'],
             attribution: 'Esri, DeLorme, HERE'
           }
         },
         DarkGrayLabels: {
-          urlTemplate: tileProtocol + '//tiles{s}.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Dark_Gray_Reference_Beta/MapServer/tile/{z}/{y}/{x}',
+          urlTemplate: tileProtocol + '//{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
           options: {
             hideLogo: true,
             logoPosition: 'bottomright',
             //pane: 'esri-label',
             minZoom: 1,
-            maxZoom: 10,
-            subdomains: ['1', '2']
+            maxZoom: 16,
+            subdomains: ['server', 'services']
           }
         },
         Gray: {
@@ -208,12 +208,14 @@
       if(config.attributionUrl){
         this._getAttributionData(config.attributionUrl);
       }
+      this._logo = new EsriLeaflet.Controls.Logo({
+        position: this.options.logoPosition
+      });
     },
     onAdd: function(map){
-      if(!this.options.hideLogo){
-        this._logo = new EsriLeaflet.Controls.Logo({
-          position: this.options.logoPosition
-        }).addTo(map);
+      if(!this.options.hideLogo && !map._hasEsriLogo){
+        this._logo.addTo(map);
+        map._hasEsriLogo = true;
       }
 
       // if(this.options.pane && EsriLeaflet.Support.pointerEvents){
@@ -227,6 +229,7 @@
     onRemove: function(map){
       if(this._logo){
         map.removeControl(this._logo);
+        map._hasEsriLogo = false;
       }
 
       L.TileLayer.prototype.onRemove.call(this, map);

@@ -21,11 +21,6 @@
         L.circle(e.latlng, e.accuracy / 2).addTo(map);
     });
     
-    // Add popup to features
-    features.bindPopup(function(feature) {
-        return L.Util.template('<b>{PURPOSE}</b><br>{OCCUPANCYTYPE}<br>Expires {EXPIRATIONDATE}', feature.properties);
-    });
-    
     // When feature layer loads in the future, show loading indicator
     features.on('loading', function() {
         NProgress.start();
@@ -37,12 +32,24 @@
         fillPanel(features._layers);
     });
     
-    // Compile template
-    var template = Handlebars.compile($("#tmpl-panel").html());
+    // Register date format Handlebars helper
+    Handlebars.registerHelper('relativeTime', function (context) {
+            return moment ? moment(context).fromNow() : context;
+    });
+    
+    // Compile templates
+    var popupTemplate = Handlebars.compile($("#tmpl-popup").html()),
+        panelTemplate = Handlebars.compile($("#tmpl-panel").html());
+    
+    // Add popup to features using template
+    features.bindPopup(function(feature) {
+        //return L.Util.template('<b>{ADDRESS}</b><br>{PURPOSE}<br>{OCCUPANCYTYPE}<br>Expires {EXPIRATIONDATE}', feature.properties);
+        return popupTemplate(feature.properties);
+    });
     
     // Fill panel with features using template
     var fillPanel = function(features) {
-        $("#panel").empty().append(template({features: features}));
+        $("#panel").empty().append(panelTemplate({features: features}));
     };
     
     // When document is fully loaded, bind the "Map View" / "List View" buttons
