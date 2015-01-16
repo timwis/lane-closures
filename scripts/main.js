@@ -1,24 +1,24 @@
 (function($) {
     var map = new L.Map('map'),
-        url = 'http://gis.phila.gov/arcgis/rest/services/BaseMaps/GrayBase_WM/MapServer/tile/{z}/{y}/{x}',
+        baseMapUrl = 'http://gis.phila.gov/arcgis/rest/services/BaseMaps/GrayBase_WM/MapServer/tile/{z}/{y}/{x}',
         attribution = 'City of Philadelphia',
-        layer = L.tileLayer(url, {maxZoom: 17, attribution: attribution, subdomains: 'abcd', detectRetina: true});
+        layer = L.tileLayer(baseMapUrl, {maxZoom: 17, attribution: attribution, subdomains: 'abcd', detectRetina: true}).addTo(map);
     
     // Zoom to Philly, add basemap
-    map.setView([39.9524, -75.1636], 12).addLayer(layer);
-    
-    // Loading indicator
-    //NProgress.start();
+    //map.setView([39.9524, -75.1636], 16).addLayer(layer);
     
     // Add feature layer
-    var features = L.esri.featureLayer('http://gis.phila.gov/arcgis/rest/services/PhilaGov/Lane_Closures_Current/MapServer/0').addTo(map);
+    var features = L.esri.featureLayer('http://gis.phila.gov/arcgis/rest/services/PhilaGov/Lane_Closures_Current/MapServer/0');
     
-    // Zoom to GPS location
-    map.locate({setView: true, maxZoom: 16});
+    // Wait 2 seconds and then zoom to GPS location
+    setTimeout(function() {
+        map.locate({setView: true, maxZoom: 16});
+    }, 2000);
     
     // When location is found, load the data
     map.on('locationfound', function(e) {
         L.circle(e.latlng, e.accuracy / 2).addTo(map);
+        features.addTo(map);
     });
     
     // When feature layer loads in the future, show loading indicator
@@ -27,14 +27,15 @@
     });
     
     // When feature layer is fully loaded, end loading indicator
-    features.on('load', function() {
+    features.on('load', function(e) {
         NProgress.done();
+        console.log("Loaded", e, features._layers.length);
         fillPanel(features._layers);
     });
     
     // Register date format Handlebars helper
     Handlebars.registerHelper('relativeTime', function (context) {
-            return moment ? moment(context).fromNow() : context;
+        return moment ? moment(context).fromNow() : context;
     });
     
     // Compile templates
@@ -43,7 +44,6 @@
     
     // Add popup to features using template
     features.bindPopup(function(feature) {
-        //return L.Util.template('<b>{ADDRESS}</b><br>{PURPOSE}<br>{OCCUPANCYTYPE}<br>Expires {EXPIRATIONDATE}', feature.properties);
         return popupTemplate(feature.properties);
     });
     
